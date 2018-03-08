@@ -3,7 +3,7 @@ from gym import spaces
 from geometry_msgs.msg import Vector3, Point, Quaternion, Pose, Twist, Wrench
 from quad_controller_rl.tasks.base_task import BaseTask
 
-class Hover(BaseTask):
+class Land(BaseTask):
     """Simple task where the goal is to lift off the ground and reach a target height."""
 
     def __init__(self):
@@ -11,32 +11,31 @@ class Hover(BaseTask):
         cube_size = 300.0  # env is cube_size x cube_size x cube_size
 
         self.observation_space = spaces.Box(
-            np.array([- cube_size / 2, - cube_size / 2,       
-                0.0]),
+            np.array([- cube_size / 2, - cube_size / 2, 0.0]),
             np.array([  cube_size / 2,   cube_size / 2, cube_size]))
         #print("Takeoff(): observation_space = {}".format(self.observation_space))  # [debug]
 
         # Action space: <force_x, .._y, .._z, torque_x, .._y, .._z>
-        max_force = 10.0
-        #max_torque = 10.0
-        max_vert = 40.0
+        max_force = 25.0
+        max_torque = 25.0
+
         self.action_space = spaces.Box(
             np.array([-max_force, -max_force, -max_force]),
-            np.array([max_force, max_force, max_vert]))
+            np.array([max_force, max_force, max_force]))
         #print("Takeoff(): action_space = {}".format(self.action_space))  # [debug]
 
         # Task-specific parameters
         self.max_duration = 10.0  # secs
-        self.target_pose_z = 10.0  # target height (z position) to reach for successful takeoff
+        self.target_pose_z = 0.0  # target height (z position) to reach for successful takeoff
         self.target_pose_x = 0.0
         self.target_pose_y = 0.0
 
-        self.max_distance = 8.0
+        self.max_distance = 5.0
 
     def reset(self):
         # Nothing to reset; just return initial condition
         return Pose(
-                position=Point(0.0, 0.0, np.random.normal(self.target_pose_z, 1)),  # drop off from a random height
+                position=Point(0.0, 0.0, np.random.normal(10, 1)),  # drop off from a random height
                 orientation=Quaternion(0.0, 0.0, 0.0, 0.0),
             ), Twist(
                 linear=Vector3(0.0, 0.0, 0.0),
@@ -51,15 +50,14 @@ class Hover(BaseTask):
 
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = np.linalg.norm([self.target_pose_x, self.target_pose_y, self.target_pose_z] - state)  # Euclidean distance from target position vector
+        error_position = np.linalg.norm([self.target_pose_x, self.target_pose_y,self.target_pose_z] - state)  # Euclidean distance from target position vector
         reward = -error_position  # reward = zero for matching target z and stayed at x,y = 0,0
 
-        distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + (pose.position.z - self.target_pose_z)**2)
+        distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
         if distance > self.max_distance:
             reward -= 50.0  # extra penalty, agent strayed too far
             done = True
-            
-        elif timestamp > self.max_duration:
+        elif abs(pose.position.z) < .2:
             reward += 50.0  # extra reward, agent made it to the end
             done = True
 
@@ -71,7 +69,6 @@ class Hover(BaseTask):
         if action is not None:
             action = np.clip(action.flatten(), self.action_space.low, self.action_space.high)  # flatten, clamp to action space limits
             return Wrench(
-                    force=Vector3(action[0], action[1], action[2])
-                ), done
+                    force=Vector3(action[0], action[1], action[2])), done
         else:
             return Wrench(), done

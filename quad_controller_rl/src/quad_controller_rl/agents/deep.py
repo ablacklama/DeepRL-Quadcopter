@@ -15,14 +15,14 @@ class DDPG(BaseAgent):
         
         self.task = task
         #self.state_size = np.prod(self.task.observation_space.shape)
-        self.state_range = self.task.observation_space.high[:3] - self.task.observation_space.low[:3]
+        self.state_range = self.task.observation_space.high - self.task.observation_space.low
         #self.action_size = np.prod(self.task.action_space.shape)
 
         # Constrain state and action spaces
         self.state_size = 3  # position only
         self.action_size = 3  # force only
-        self.action_low = self.task.action_space.low[0:3]
-        self.action_high = self.task.action_space.high[0:3]
+        self.action_low = self.task.action_space.low
+        self.action_high = self.task.action_space.high
         print("Original spaces: {}, {}\nConstrained spaces: {}, {}".format(
             self.task.observation_space.shape, self.task.action_space.shape,
             self.state_size, self.action_size))
@@ -31,7 +31,7 @@ class DDPG(BaseAgent):
         self.load_weights = True  # try to load weights from previously saved models
         self.save_weights_every = 10  # save weights every n episodes, None to disable
         self.model_dir = util.get_param('out')  # you can use a separate subdirectory for each task and/or neural net architecture
-        self.model_name = "deepModel"
+        self.model_name = "deepLanding"
         self.model_ext = ".h5"
         if self.load_weights or self.save_weights_every:
             self.actor_filename = os.path.join(self.model_dir,
@@ -101,17 +101,17 @@ class DDPG(BaseAgent):
 
     def preprocess_state(self, state):
         """Reduce state vector to relevant dimensions."""
-        return state[0:3]  # position only
+        return state  # position only
 
     def postprocess_action(self, action):
         """Return complete action vector."""
         complete_action = np.zeros(self.task.action_space.shape)  # shape: (6,)
-        complete_action[0:3] = action  # linear force only
+        complete_action = action  # linear force only
 
         return complete_action
     def step(self, state, reward, done):
         # Transform state vector
-        state = (state[:3] - self.task.observation_space.low[:3]) / self.state_range[:3]  # scale to [0.0, 1.0]
+        state = (state - self.task.observation_space.low) / self.state_range  # scale to [0.0, 1.0]
         state = state.reshape(1, -1)  # convert to row vector
         state = self.preprocess_state(state)
 
