@@ -29,9 +29,9 @@ class Land(BaseTask):
         self.target_pose_z = 0.0  # target height (z position) to reach for successful takeoff
         self.target_pose_x = 0.0
         self.target_pose_y = 0.0
-        self.target_vel_z = 2.0
 
-        self.max_distance = 5.0
+
+        self.max_distance = 10.0
 
     def reset(self):
         # Nothing to reset; just return initial condition
@@ -50,17 +50,19 @@ class Land(BaseTask):
             pose.position.x, pose.position.y, pose.position.z])
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = np.linalg.norm([self.target_pose_z] - state[2])  # Euclidean distance from target position vector
-        error_velocity = min(self.target_vel_z - angular_velocity.z, 0)
-        reward = -error_position + error_velocity  # reward = zero for matching target z and stayed at x,y = 0,0
+        error_position = (np.linalg.norm([self.target_pose_z] - state[2]))/2.0  # Euclidean distance from target position vector
+        error_velocity = np.linalg.norm([angular_velocity.x, angular_velocity.y, angular_velocity.z])
+        reward = -error_position - error_velocity  # reward = zero for matching target z and stayed at x,y = 0,0
 
         distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
         if distance > self.max_distance:
             reward -= 50.0  # extra penalty, agent strayed too far
             done = True
         elif abs(pose.position.z) < .2:
-            reward += 50.0  # extra reward, agent made it to the end
-            done = True
+            reward += 20.0  # extra reward, agent made it to the end
+            if(timestamp > self.max_duration):
+                done = True
+        
 
         # Take one RL step, passing in current state and reward, and obtain action
         # Note: The reward passed in here is the result of past action(s)
