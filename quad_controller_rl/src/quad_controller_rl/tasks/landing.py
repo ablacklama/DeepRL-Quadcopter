@@ -11,8 +11,8 @@ class Land(BaseTask):
         cube_size = 300.0  # env is cube_size x cube_size x cube_size
 
         self.observation_space = spaces.Box(
-            np.array([- cube_size / 2, - cube_size / 2, 0.0]),
-            np.array([  cube_size / 2,   cube_size / 2, cube_size]))
+            np.array([- cube_size / 2, - cube_size / 2, 0.0,-1.0, -1.0, -1.0, -1.0]),
+            np.array([  cube_size / 2,   cube_size / 2, cube_size,1.0, 1.0, 1.0, 1.0]))
         #print("Takeoff(): observation_space = {}".format(self.observation_space))  # [debug]
 
         # Action space: <force_x, .._y, .._z, torque_x, .._y, .._z>
@@ -20,8 +20,8 @@ class Land(BaseTask):
         max_torque = 25.0
 
         self.action_space = spaces.Box(
-            np.array([-max_force, -max_force, -max_force]),
-            np.array([max_force, max_force, max_force]))
+            np.array([-max_force, -max_force, -max_force,-max_torque,-max_torque,-max_torque]),
+            np.array([max_force, max_force, max_force,max_torque,max_torque,max_torque]))
         #print("Takeoff(): action_space = {}".format(self.action_space))  # [debug]
 
         # Task-specific parameters
@@ -29,6 +29,7 @@ class Land(BaseTask):
         self.target_pose_z = 0.0  # target height (z position) to reach for successful takeoff
         self.target_pose_x = 0.0
         self.target_pose_y = 0.0
+        self.target_vel_z = 2.0
 
         self.max_distance = 5.0
 
@@ -47,11 +48,11 @@ class Land(BaseTask):
         # Prepare state vector (pose only; ignore angular_velocity, linear_acceleration)
         state = np.array([
             pose.position.x, pose.position.y, pose.position.z])
-
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = np.linalg.norm([self.target_pose_x, self.target_pose_y,self.target_pose_z] - state)  # Euclidean distance from target position vector
-        reward = -error_position  # reward = zero for matching target z and stayed at x,y = 0,0
+        error_position = np.linalg.norm([self.target_pose_z] - state[2])  # Euclidean distance from target position vector
+        error_velocity = min(self.target_vel_z - angular_velocity.z, 0)
+        reward = -error_position + error_velocity  # reward = zero for matching target z and stayed at x,y = 0,0
 
         distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
         if distance > self.max_distance:

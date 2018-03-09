@@ -21,8 +21,8 @@ class DDPG(BaseAgent):
         # Constrain state and action spaces
         self.state_size = 3  # position only
         self.action_size = 3  # force only
-        self.action_low = self.task.action_space.low
-        self.action_high = self.task.action_space.high
+        self.action_low = self.task.action_space.low[:self.action_size]
+        self.action_high = self.task.action_space.high[:self.action_size]
         print("Original spaces: {}, {}\nConstrained spaces: {}, {}".format(
             self.task.observation_space.shape, self.task.action_space.shape,
             self.state_size, self.action_size))
@@ -31,7 +31,7 @@ class DDPG(BaseAgent):
         self.load_weights = True  # try to load weights from previously saved models
         self.save_weights_every = 10  # save weights every n episodes, None to disable
         self.model_dir = util.get_param('out')  # you can use a separate subdirectory for each task and/or neural net architecture
-        self.model_name = "deepLanding"
+        self.model_name = "LandingModel_v1"
         self.model_ext = ".h5"
         if self.load_weights or self.save_weights_every:
             self.actor_filename = os.path.join(self.model_dir,
@@ -101,23 +101,22 @@ class DDPG(BaseAgent):
 
     def preprocess_state(self, state):
         """Reduce state vector to relevant dimensions."""
-        return state  # position only
+        return state[:self.state_size]  # position only
 
     def postprocess_action(self, action):
         """Return complete action vector."""
         complete_action = np.zeros(self.task.action_space.shape)  # shape: (6,)
-        complete_action = action  # linear force only
+        complete_action[0:len(action[0])] = action  # linear force only
 
         return complete_action
     def step(self, state, reward, done):
         # Transform state vector
-        state = (state - self.task.observation_space.low) / self.state_range  # scale to [0.0, 1.0]
+        state = (state - self.task.observation_space.low[:self.state_size]) / self.state_range[:self.state_size]  # scale to [0.0, 1.0]
         state = state.reshape(1, -1)  # convert to row vector
         state = self.preprocess_state(state)
 
         # Choose an action
         action = self.act(state)
-
         # Save experience / reward
         if self.last_state is not None and self.last_action is not None:
             self.total_reward += reward
@@ -133,8 +132,8 @@ class DDPG(BaseAgent):
         if done:
             # Print some episode stats
             self.best_reward = max(self.best_reward, self.total_reward/max(1, self.count))
-            print("Deep RL: t = {:<4d}, score = {:<7.3f} best = {:<7.3f}\n".format(
-                self.count, self.total_reward/max(1, self.count), self.best_reward))
+            print("Deep RL: t = {:<4d}, score = {:<7.3f} best = {:<7.3f} total = {:<7.3f}\n".format(
+                self.count, self.total_reward/max(1, self.count), self.best_reward, self.total_reward))
             # Write episode stats
             self.write_stats([self.episode_num, self.total_reward])
             self.episode_num += 1
@@ -231,7 +230,7 @@ class Actor:
         self.action_range = self.action_high - self.action_low
 
         # Initialize any other variables here
-        self.learn_rate = 0.00005
+        self.learn_rate = 0.001
 
         self.build_model()
 
@@ -287,7 +286,7 @@ class Critic:
         self.action_size = action_size
 
         # Initialize any other variables here
-        self.learn_rate = 0.00005
+        self.learn_rate = 0.001
 
         self.build_model()
 

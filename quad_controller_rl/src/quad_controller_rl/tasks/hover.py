@@ -11,8 +11,7 @@ class Hover(BaseTask):
         cube_size = 300.0  # env is cube_size x cube_size x cube_size
 
         self.observation_space = spaces.Box(
-            np.array([- cube_size / 2, - cube_size / 2,       
-                0.0]),
+            np.array([- cube_size / 2, - cube_size / 2, 0.0]),
             np.array([  cube_size / 2,   cube_size / 2, cube_size]))
         #print("Takeoff(): observation_space = {}".format(self.observation_space))  # [debug]
 
@@ -51,14 +50,17 @@ class Hover(BaseTask):
 
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = np.linalg.norm([self.target_pose_x, self.target_pose_y, self.target_pose_z] - state)  # Euclidean distance from target position vector
-        reward = -error_position  # reward = zero for matching target z and stayed at x,y = 0,0
+        error_position = np.linalg.norm(self.target_pose_z - state[2])  # Euclidean distance from target position vector
+        #print("error_position: {}".format(error_position))
+        reward = 10
+        if(error_position > 2):
+            reward = -error_position  # reward = zero for matching target z and stayed at x,y = 0,0
 
         distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + (pose.position.z - self.target_pose_z)**2)
         if distance > self.max_distance:
             reward -= 50.0  # extra penalty, agent strayed too far
             done = True
-            
+
         elif timestamp > self.max_duration:
             reward += 50.0  # extra reward, agent made it to the end
             done = True
