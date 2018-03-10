@@ -11,18 +11,18 @@ class Hover(BaseTask):
         cube_size = 300.0  # env is cube_size x cube_size x cube_size
 
         self.observation_space = spaces.Box(
-            np.array([- cube_size / 2, - cube_size / 2, 0.0]),
-            np.array([  cube_size / 2,   cube_size / 2, cube_size]))
+            np.array([- cube_size / 2, - cube_size / 2, 0.0, -1.0, -1.0, -1.0, -1.0]),
+            np.array([  cube_size / 2,   cube_size / 2, cube_size, 1.0, 1.0, 1.0, 1.0]))
         #print("Takeoff(): observation_space = {}".format(self.observation_space))  # [debug]
 
         # Action space: <force_x, .._y, .._z, torque_x, .._y, .._z>
-        max_force = 10.0
-        #max_torque = 10.0
-        max_vert = 40.0
+        max_force = 25.0
+        max_torque = 25.0
+        max_vert = 25.0
         self.action_space = spaces.Box(
-            np.array([-max_force, -max_force, -max_force]),
-            np.array([max_force, max_force, max_vert]))
-        #print("Takeoff(): action_space = {}".format(self.action_space))  # [debug]
+            np.array([-max_force, -max_force, -max_force, -max_torque, -max_torque, -max_torque]),
+            np.array([max_force, max_force, max_vert, max_torque, max_torque, max_torque]))
+        #print("Takeoff(): action_space = {}".format(self.acti, -maxon_space))  # [debug]
 
         # Task-specific parameters
         self.max_duration = 10.0  # secs
@@ -46,23 +46,20 @@ class Hover(BaseTask):
     def update(self, timestamp, pose, angular_velocity, linear_acceleration):
         # Prepare state vector (pose only; ignore angular_velocity, linear_acceleration)
         state = np.array([
-            pose.position.x, pose.position.y, pose.position.z])
-
+            pose.position.x, pose.position.y, pose.position.z, 
+            pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = np.linalg.norm(self.target_pose_z - state[2])  # Euclidean distance from target position vector
+        
         #print("error_position: {}".format(error_position))
-        reward = 10
-        if(error_position > 2):
-            reward = -error_position  # reward = zero for matching target z and stayed at x,y = 0,0
-
-        distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + (pose.position.z - self.target_pose_z)**2)
-        if distance > self.max_distance:
-            reward -= 50.0  # extra penalty, agent strayed too far
+        reward = 3 - (3 *(self.target_pose_z - pose.position.z)**2)
+        z_range = 5
+        if pose.position.z > self.target_pose_z + z_range or pose.position.z < self.target_pose_z - z_range:
+            reward -= 500.0  # extra penalty, agent strayed too far
             done = True
 
         elif timestamp > self.max_duration:
-            reward += 50.0  # extra reward, agent made it to the end
+            reward += 500.0  # extra reward, agent made it to the end
             done = True
 
         # Take one RL step, passing in current state and reward, and obtain action
@@ -73,7 +70,8 @@ class Hover(BaseTask):
         if action is not None:
             action = np.clip(action.flatten(), self.action_space.low, self.action_space.high)  # flatten, clamp to action space limits
             return Wrench(
-                    force=Vector3(action[0], action[1], action[2])
+                    force=Vector3(action[0], action[1], action[2]),
+                    torque=Vector3(action[3], action[4], action[5])
                 ), done
         else:
             return Wrench(), done

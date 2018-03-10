@@ -25,7 +25,7 @@ class Land(BaseTask):
         #print("Takeoff(): action_space = {}".format(self.action_space))  # [debug]
 
         # Task-specific parameters
-        self.max_duration = 10.0  # secs
+        self.max_duration = 5.0  # secs
         self.target_pose_z = 0.0  # target height (z position) to reach for successful takeoff
         self.target_pose_x = 0.0
         self.target_pose_y = 0.0
@@ -47,21 +47,23 @@ class Land(BaseTask):
     def update(self, timestamp, pose, angular_velocity, linear_acceleration):
         # Prepare state vector (pose only; ignore angular_velocity, linear_acceleration)
         state = np.array([
-            pose.position.x, pose.position.y, pose.position.z])
+            pose.position.x, pose.position.y, pose.position.z,
+            pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]).reshape(1, -1)
         # Compute reward / penalty and check if this episode is complete
         done = False
-        error_position = (np.linalg.norm([self.target_pose_z] - state[2]))/2.0  # Euclidean distance from target position vector
-        error_velocity = np.linalg.norm([angular_velocity.x, angular_velocity.y, angular_velocity.z])
-        reward = -error_position - error_velocity  # reward = zero for matching target z and stayed at x,y = 0,0
 
-        distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
-        if distance > self.max_distance:
-            reward -= 50.0  # extra penalty, agent strayed too far
+        error_position = - abs(self.target_pose_z - pose.position.z)  # Euclidean distance from target position vector
+        acc_error = 5.0 * linear_acceleration.z
+        reward = error_position + acc_error  # reward = zero for matching target z and stayed at x,y = 0,0
+
+        #distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
+        #if distance > self.max_distance:
+         #   reward -= 50.0  # extra penalty, agent strayed too far
+          #  done = True
+        #elif abs(pose.position.z) < .2:
+         #   reward += 20.0  # extra reward, agent made it to the end
+        if(timestamp > self.max_duration):
             done = True
-        elif abs(pose.position.z) < .2:
-            reward += 20.0  # extra reward, agent made it to the end
-            if(timestamp > self.max_duration):
-                done = True
         
 
         # Take one RL step, passing in current state and reward, and obtain action
@@ -72,6 +74,7 @@ class Land(BaseTask):
         if action is not None:
             action = np.clip(action.flatten(), self.action_space.low, self.action_space.high)  # flatten, clamp to action space limits
             return Wrench(
-                    force=Vector3(action[0], action[1], action[2])), done
+                    force=Vector3(action[0], action[1], action[2]), 
+                    torque=Vector3(action[3], action[4], action[5])),done
         else:
             return Wrench(), done

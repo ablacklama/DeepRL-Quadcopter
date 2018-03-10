@@ -9,7 +9,7 @@ import pandas as pd
 from quad_controller_rl import util
 
 
-class DDPG(BaseAgent):
+class LANDAGENT(BaseAgent):
     """Reinforcement Learning agent that learns using DDPG."""
     def __init__(self, task):
         
@@ -19,10 +19,10 @@ class DDPG(BaseAgent):
         #self.action_size = np.prod(self.task.action_space.shape)
 
         # Constrain state and action spaces
-        self.state_size = 3  # position only
-        self.action_size = 3  # force only
-        self.action_low = self.task.action_space.low[:self.action_size]
-        self.action_high = self.task.action_space.high[:self.action_size]
+        self.state_size = 1  # position only
+        self.action_size = 1  # force only
+        self.action_low = self.task.action_space.low[2]
+        self.action_high = self.task.action_space.high[2]
         print("Original spaces: {}, {}\nConstrained spaces: {}, {}".format(
             self.task.observation_space.shape, self.task.action_space.shape,
             self.state_size, self.action_size))
@@ -31,7 +31,7 @@ class DDPG(BaseAgent):
         self.load_weights = True  # try to load weights from previously saved models
         self.save_weights_every = 10  # save weights every n episodes, None to disable
         self.model_dir = util.get_param('out')  # you can use a separate subdirectory for each task and/or neural net architecture
-        self.model_name = "HoverModel_v2"
+        self.model_name = "LandModel_v2"
         self.model_ext = ".h5"
         if self.load_weights or self.save_weights_every:
             self.actor_filename = os.path.join(self.model_dir,
@@ -101,6 +101,7 @@ class DDPG(BaseAgent):
 
     def preprocess_state(self, state):
         """Reduce state vector to relevant dimensions."""
+        state = np.squeeze(state)
         return state[2]  # position only
 
     def postprocess_action(self, action):
@@ -112,8 +113,9 @@ class DDPG(BaseAgent):
     def step(self, state, reward, done):
         # Transform state vector
         state = (state - self.task.observation_space.low[:self.state_size]) / self.state_range[:self.state_size]  # scale to [0.0, 1.0]
-        state = state.reshape(1, -1)  # convert to row vector
         state = self.preprocess_state(state)
+
+        state = state.reshape(1, -1)  # convert to row vector
 
         # Choose an action
         action = self.act(state)
@@ -147,11 +149,11 @@ class DDPG(BaseAgent):
         self.last_action = action
         return self.postprocess_action(action)
 
-    def act(self, states):
+    def act(self, state):
         """Returns actions for given state(s) as per current policy."""
-        states = np.reshape(states, [-1, self.state_size])
-        actions = self.actor_local.model.predict(states)
-        return actions + self.noise.sample()  # add some noise for exploration
+        state = np.reshape(state, [-1, self.state_size])
+        action = self.actor_local.model.predict(state)
+        return action + self.noise.sample()  # add some noise for exploration
 
     def learn(self, experiences):
         """Update policy and value parameters using given batch of experience tuples."""
@@ -241,7 +243,6 @@ class Actor:
 
         # Add hidden layers
         net = layers.Dense(units=32, activation='relu')(states)
-        net = layers.Dense(units=64, activation='relu')(net)
         net = layers.Dense(units=32, activation='relu')(net)
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
@@ -298,12 +299,10 @@ class Critic:
 
         # Add hidden layer(s) for state pathway
         net_states = layers.Dense(units=32, activation='relu')(states)
-        net_states = layers.Dense(units=64, activation='relu')(net_states)
         net_states = layers.Dense(units=32, activation='relu')(net_states)
 
         # Add hidden layer(s) for action pathway
         net_actions = layers.Dense(units=32, activation='relu')(actions)
-        net_actions = layers.Dense(units=64, activation='relu')(net_actions)
         net_actions = layers.Dense(units=32, activation='relu')(net_actions)
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
