@@ -52,9 +52,9 @@ class Land(BaseTask):
         # Compute reward / penalty and check if this episode is complete
         done = False
 
-        error_position = - abs(self.target_pose_z - pose.position.z)  # Euclidean distance from target position vector
+        error_position = - abs(self.target_pose_z - pose.position.z)  
         acc_error = 5.0 * linear_acceleration.z
-        reward = error_position + acc_error  # reward = zero for matching target z and stayed at x,y = 0,0
+        reward = error_position + acc_error  # reward = zero for matching target z and not accelerating downwards
 
         #distance = np.sqrt(pose.position.x**2 + pose.position.y**2 + max(pose.position.z - 10, 0))
         #if distance > self.max_distance:

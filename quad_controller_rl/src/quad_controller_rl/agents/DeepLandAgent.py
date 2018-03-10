@@ -31,7 +31,7 @@ class LANDAGENT(BaseAgent):
         self.load_weights = True  # try to load weights from previously saved models
         self.save_weights_every = 10  # save weights every n episodes, None to disable
         self.model_dir = util.get_param('out')  # you can use a separate subdirectory for each task and/or neural net architecture
-        self.model_name = "LandModel_v2"
+        self.model_name = "LandModel_v3"
         self.model_ext = ".h5"
         if self.load_weights or self.save_weights_every:
             self.actor_filename = os.path.join(self.model_dir,
